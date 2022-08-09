@@ -1,12 +1,18 @@
+import os
 from utils import *
+from encData import encData
 from random import randint
 from time import sleep
+from Crypto.Random import get_random_bytes
+
+img_path = str(os.path.dirname(os.path.abspath(__file__))) + '\\' + "test_data.jpg"
 
 class Issuer():
     def __init__(self):
         super().__init__()
         self.addr = "0x12NBhaHX4KZJ42AMpZ4pixETMTcvqTpTQ8"
         self.pk = "04ef809d29b7c8064ae3a302ce7a5d7265216918a9ff5d60a72534ec7bb926521181a4580a3a7f156b009d45f947a9613da8f8ce8c8536a0b0d59e516fb8c19fc4"
+        self.pkd = "04ef80333b7c8064ae3a302ce7a5d7265216918a9ff5d60a72534ec7bb926521181a4580a3a7f156b009d45f947a9613da8f8ce8c8536a0b0d59e516fb8c19fc12"
         self.sk = "39e02c46a08382b7b352b4f1a9d38698b8fe7c8eb74ead609c804b25eeb1db52"
 
     def getAddress(self):
@@ -14,6 +20,9 @@ class Issuer():
     
     def getPubkey(self):
         return self.pk                                              # Issuer의 public key return
+
+    def getPubkey_data(self):
+        return self.pkd
 
     def issueDIDCredential(self, addr, attr):                       # addr: peer의 address / attr: issue하려는 attr
         r = list()                                                  # r, t는 다시 peer에게 보내야 하기에 list로 저장
@@ -119,15 +128,49 @@ class Peer():                                                       # 필요한 
         except:
             return False
     
+    
+    def geninfo(self, attr, r, attr_data, pk_did, pk_data, data):
+
+        data_id = hash(data)
+        data_key = get_random_bytes(16); h_k = hash(data_key)
+        CT = self.encset(data_key, data); h_ct = hash(CT)
+        
+        pk_enc = get_random_bytes(16) # pubkey라 가정
+        pk_own = get_random_bytes(16) # pubkey라 가정
+        pre_did = self.createDIDPresentation(1, 1, attr, r, pk_did)
+        pre_data = self.createDataPresentation(1, 1, attr_data, r, pk_data, data_key, CT, data)
+       
+        info = (pre_did, pre_data, h_ct, h_k, pk_enc, pk_own)   
+        return info, CT
+    
     def genProof(self, crs, x, w):                                  # statement x와 witness w를 가지고 proof pi 생성
-        pi = (crs, x, w)                                            # proof 만들기
+        pi = (crs, x, w)                                            # proof 만들기   
         return pi
     
-    def makeDIDPresentation(self, crs, x, attr, t, r, pk):
-        c = hash(pk, hash(attr, t, r))
-        w = (c, attr, t, r, pk)
-        pi = self.genProof(crs, x, w)
-        return (x, pi)
+    def createDIDPresentation(self, crs, x, attr, r, pk):
+        c = hash(pk, hash(attr, self.pk, r))
+        w = (c, attr, r, pk)
+        pi_did = self.genProof(crs, x, w)
+        return (x, pi_did)
+
+    
+    def createDataPresentation(self, crs, x, attr_data, r, pk_data, data_key, CT, data):
+        c = hash(pk_data, attr_data, data, r)
+        w = (hash(data), c, attr_data, r, pk_data, data, data_key, CT)
+        pi_data = self.genProof(crs, x, w)
+        return (x, pi_data)
+
+    # 나중에 파일에서 불러서 처리할 것
+    def makeTransaction(self, msg):
+        return hash(msg)
+
+    def send2server(self, CT):
+        return True
+
+    def encset(self, data_key, data):
+        enc = encData(data_key, data)
+        enc.enc()
+        return enc.getCT()
 
 def main():
     peer = Peer()
@@ -141,7 +184,15 @@ def main():
     rattr = ["Incheon", "M"]
     rt, rr = peer.requestDIDCredentialRevoke(issuer, rattr)
     peer.deleteDIDCredential(rattr, rt, rr)
-    print("hi")
+    
+
+    data = img_path; r_data = 1; attr_data = ["M"]; pattr = ["1997", "Incheon", "M"]
+    info, CT = peer.geninfo(pattr, r_data, attr_data, issuer.getPubkey, issuer.getPubkey_data, data)
+    peer.makeTransaction(info)
+    print("============ [Test: Transfer info to blockchain completed] ============")
+    peer.send2server(CT)
+    print("============== [Test: Transfer data to sever completed] ===============")
+    
 
 if __name__ == "__main__":
     main()
