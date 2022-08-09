@@ -141,6 +141,7 @@ def main():
     rattr = ["Incheon", "M"]
     rt, rr = peer.requestDIDCredentialRevoke(issuer, rattr)
     peer.deleteDIDCredential(rattr, rt, rr)
+    print("hi")
 
 if __name__ == "__main__":
     main()
