@@ -3,7 +3,6 @@ from Crypto.Math.Primality import generate_probable_safe_prime
 from Crypto.Random import get_random_bytes
 from Crypto.Math.Numbers import Integer
 from binascii import hexlify, unhexlify
-from struct import pack
 
 class ElGamal:
     def __init__(self):
