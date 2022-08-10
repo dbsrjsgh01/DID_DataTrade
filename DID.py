@@ -1,7 +1,6 @@
 import os
 from utils import *
 from encData import encData
-from random import randint
 from time import sleep
 from Crypto.Random import get_random_bytes
 
@@ -28,7 +27,7 @@ class Issuer():
         r = list()                                                  # r, t는 다시 peer에게 보내야 하기에 list로 저장
         t = list()
         for a in attr:
-            r.append(randint(0, 100))                               # random 뽑아서 r에 추가
+            r.append(get_random_bytes(16))                          # random 뽑아서 r에 추가
             data = (addr, a, r[-1])                                 # 하나로 모아서
             t.append(hash(data))                                    # hash한 값을 t에 추가
         tx_msg = "issue: " + "||".join(t)                           # Transaction 생성하기 위한 메세지 설정
@@ -161,13 +160,12 @@ class Peer():                                                       # 필요한 
         return (x, pi_data)
 
     def registerInfo(self, info, CT):
-        self.makeTrasaction(info)
-        self.send2server(CT)
+        if makeTransaction(self.pk, info):
+            print("============ [Test: Transfer info to blockchain completed] ============")
+        if self.send2server(CT):
+            print("============== [Test: Transfer data to sever completed] ===============")
 
     # 나중에 파일에서 불러서 처리할 것
-    def makeTransaction(self, msg):
-        return hash(msg)
-
     def send2server(self, CT):
         return True
 
@@ -179,7 +177,7 @@ class Peer():                                                       # 필요한 
 def main():
     peer = Peer()
     issuer = Issuer()
-    iattr = ["1997", "Incheon", "M"]
+    iattr = ["1997", "7", "31", "Incheon", "M"]
     print("==================== [Test:  Issue] ====================")
     it, ir = peer.requestDIDCredentialIssue(issuer, iattr)
     peer.storeDIDCredential(iattr, it, ir)
@@ -189,14 +187,9 @@ def main():
     rt, rr = peer.requestDIDCredentialRevoke(issuer, rattr)
     peer.deleteDIDCredential(rattr, rt, rr)
     
-
-    data = img_path; r_data = 1; attr_data = ["M"]; pattr = ["1997", "Incheon", "M"]
-    info, CT = peer.geninfo(pattr, r_data, attr_data, issuer.getPubkey, issuer.getPubkey_data, data)
-    peer.makeTransaction(info)
-    print("============ [Test: Transfer info to blockchain completed] ============")
-    peer.send2server(CT)
-    print("============== [Test: Transfer data to sever completed] ===============")
-    
+    data = img_path; r_data = 1; attr_data = ["M"]; pattr = ["1997", "Incheon", "M"]; pr = [ir[0], ir[3], ir[4]] # 임시로 그냥 끌고 와서 사용
+    info, CT = peer.geninfo(pattr, pr, attr_data, r_data, issuer.getPubkey, issuer.getPubkey_data, data)
+    peer.registerInfo(info, CT)
 
 if __name__ == "__main__":
     main()
