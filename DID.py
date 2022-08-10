@@ -129,7 +129,7 @@ class Peer():                                                       # 필요한 
             return False
     
     
-    def geninfo(self, attr, r, attr_data, pk_did, pk_data, data):
+    def geninfo(self, attr, r, attr_data, r_data, pk_did, pk_data, data):
 
         data_id = hash(data)
         data_key = get_random_bytes(16); h_k = hash(data_key)
@@ -138,7 +138,7 @@ class Peer():                                                       # 필요한 
         pk_enc = get_random_bytes(16) # pubkey라 가정
         pk_own = get_random_bytes(16) # pubkey라 가정
         pre_did = self.createDIDPresentation(1, 1, attr, r, pk_did)
-        pre_data = self.createDataPresentation(1, 1, attr_data, r, pk_data, data_key, CT, data)
+        pre_data = self.createDataPresentation(1, 1, attr_data, r_data, pk_data, data_key, CT, data)
        
         info = (pre_did, pre_data, h_ct, h_k, pk_enc, pk_own)   
         return info, CT
@@ -148,17 +148,21 @@ class Peer():                                                       # 필요한 
         return pi
     
     def createDIDPresentation(self, crs, x, attr, r, pk):
-        c = hash(pk, hash(attr, self.pk, r))
+        c = hash(pk, hash(self.getAddress(), attr, r))
         w = (c, attr, r, pk)
         pi_did = self.genProof(crs, x, w)
         return (x, pi_did)
-
     
-    def createDataPresentation(self, crs, x, attr_data, r, pk_data, data_key, CT, data):
-        c = hash(pk_data, attr_data, data, r)
-        w = (hash(data), c, attr_data, r, pk_data, data, data_key, CT)
+    def createDataPresentation(self, crs, x, attr_data, r_data, pk_data, data_key, CT, data):
+        data_id = hash(data)
+        c = hash(pk_data, hash(data_id, attr_data, r_data, data))
+        w = (data_id, c, attr_data, r_data, pk_data, data, data_key, CT)
         pi_data = self.genProof(crs, x, w)
         return (x, pi_data)
+
+    def registerInfo(self, info, CT):
+        self.makeTrasaction(info)
+        self.send2server(CT)
 
     # 나중에 파일에서 불러서 처리할 것
     def makeTransaction(self, msg):
