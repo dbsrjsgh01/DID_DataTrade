@@ -24,19 +24,19 @@ class ElGamal:
                                     randfunc=get_random_bytes)
         
         self.y = pow(self.g, self.x, self.p)
+
         self.p = int(self.p)
         self.g = int(self.g)
         self.x = int(self.x)
         self.y = int(self.y)
-        
-        print("===================== [ElGamal Key Setting] =====================")
-        print("p\t: ", self.p)
-        print("g\t: ", self.g)
-        print("x\t: ", self.x)
-        print("y\t: ", self.y, "\n")
+    
+    def getPublicKey(self):
+        return self.p, self.g, self.y
+    
+    def getPrivateKey(self):
+        return self.x
 
     def encrypt(self, msg):
-        print("======================= [Encrypt Message] =======================")
         msg_byte = msg.encode('utf-8')
         m = int(hexlify(msg_byte), 16)
         r = get_random_bytes(16)
@@ -46,21 +46,8 @@ class ElGamal:
         return c1, c2
     
     def decrypt(self, c1, c2):
-        print("======================= [Decrypt Message] =======================")
         s = pow(c1, self.x, self.p)
         m = (c2 * inverse(s, self.p)) % self.p
         m = format(m, 'x')
         msg = unhexlify(m).decode('utf-8')
         return msg
-
-def main():
-    dxy = ElGamal()
-    msg = "Geonho Yoon"
-    c1, c2 = dxy.encrypt(msg)
-    print("C1\t: ", c1)
-    print("C2\t: ", c2, "\n")
-    dm = dxy.decrypt(c1, c2)
-    print("Decrypt : ", dm)
-
-if __name__ == "__main__":
-    main()
