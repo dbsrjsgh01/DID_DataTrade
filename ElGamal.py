@@ -4,6 +4,9 @@ from Crypto.Random import get_random_bytes
 from Crypto.Math.Numbers import Integer
 from binascii import hexlify, unhexlify
 
+def generate():
+    return ElGamal()
+
 class ElGamal:
     def __init__(self):
         self.p = generate_probable_safe_prime(exact_bits = 256, randfunc=get_random_bytes)
