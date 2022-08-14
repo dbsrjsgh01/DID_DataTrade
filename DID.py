@@ -3,6 +3,7 @@ from utils import *
 from encData import encData
 from time import sleep
 from Crypto.Random import get_random_bytes
+from ElGamal import *
 
 img_path = str(os.path.dirname(os.path.abspath(__file__))) + '\\' + "test_data.jpg"
 
@@ -10,9 +11,9 @@ class Issuer():
     def __init__(self):
         super().__init__()
         self.addr = "0x12NBhaHX4KZJ42AMpZ4pixETMTcvqTpTQ8"
-        self.pk = "04ef809d29b7c8064ae3a302ce7a5d7265216918a9ff5d60a72534ec7bb926521181a4580a3a7f156b009d45f947a9613da8f8ce8c8536a0b0d59e516fb8c19fc4"
+        self.pk = initialize_ElGamal()
+        self.sk = self.pk.getPrivateKey()
         self.pkd = "04ef80333b7c8064ae3a302ce7a5d7265216918a9ff5d60a72534ec7bb926521181a4580a3a7f156b009d45f947a9613da8f8ce8c8536a0b0d59e516fb8c19fc12"
-        self.sk = "39e02c46a08382b7b352b4f1a9d38698b8fe7c8eb74ead609c804b25eeb1db52"
 
     def getAddress(self):
         return self.addr
@@ -50,8 +51,8 @@ class Peer():                                                       # 필요한 
     def __init__(self):                                             # 개인 key 생성도 같이 할까
         super().__init__()
         self.addr = "0x1JqFz5Q7iDdKPsMycHk9GsrPPMTqdpKJcn"
-        self.sk = "aa2f5774003914092f44d1e495e11d3433cdcd85e50542fdfc497b6a0eb4fc3a"
-        self.pk = "047951daebb010f0c226c42404ac5e34921f40eb9cec6808247ff4975fbeb361b2d195e41780cac5505990b579aaf93247b2fa376e1b0983b2bd1242f9dcbcfb41"
+        self.pk_enc = initialize_ElGamal()
+        self.sk = self.pk_enc.getPrivateKey()
 
     def getAddress(self):
         return self.addr                                            # 주소(addr)을 return
@@ -127,21 +128,6 @@ class Peer():                                                       # 필요한 
         except:
             return False
     
-    
-    def geninfo(self, attr, r, attr_data, r_data, pk_did, pk_data, data):
-
-        data_id = hash(data)
-        data_key = get_random_bytes(16); h_k = hash(data_key)
-        CT = self.encset(data_key, data); h_ct = hash(CT)
-        
-        pk_enc = get_random_bytes(16) # pubkey라 가정
-        pk_own = get_random_bytes(16) # pubkey라 가정
-        pre_did = self.createDIDPresentation(1, 1, attr, r, pk_did)
-        pre_data = self.createDataPresentation(1, 1, attr_data, r_data, pk_data, data_key, CT, data)
-       
-        info = (pre_did, pre_data, h_ct, h_k, pk_enc, pk_own)   
-        return info, CT
-    
     def genProof(self, crs, x, w):                                  # statement x와 witness w를 가지고 proof pi 생성
         pi = (crs, x, w)                                            # proof 만들기   
         return pi
@@ -160,11 +146,25 @@ class Peer():                                                       # 필요한 
         return (x, pi_data)
 
     def registerInfo(self, info, CT):
-        if makeTransaction(self.pk, info):
+        if makeTransaction(self.pk_enc, info):
             print("============ [Test: Transfer info to blockchain completed] ============")
         if self.send2server(CT):
             print("============== [Test: Transfer data to sever completed] ===============")
 
+    def geninfo(self, attr, r, attr_data, r_data, pk_did, pk_data, data):
+        # data_id = hash(data)                                      # createDataPresentation에서 생성하고
+                                                                    # genProof를 통해 검증하는 것도 있으니 생략해도 괜찮을 듯
+        data_key = get_random_bytes(16); h_k = hash(data_key)
+        CT = self.encset(data_key, data); h_ct = hash(CT)
+        
+        self.pk_enc = generate()                                    # ElGamal이라 가정
+        self.pk_own = get_random_bytes(16)                          # aes encrypt라 가정
+        pre_did = self.createDIDPresentation(1, 1, attr, r, pk_did)
+        pre_data = self.createDataPresentation(1, 1, attr_data, r_data, pk_data, data_key, CT, data)
+       
+        info = (pre_did, pre_data, h_ct, h_k, self.pk_enc, self.pk_own)
+        return info, CT
+    
     # 나중에 파일에서 불러서 처리할 것
     def send2server(self, CT):
         return True
@@ -173,6 +173,52 @@ class Peer():                                                       # 필요한 
         enc = encData(data_key, data)
         enc.enc()
         return enc.getCT()
+
+    def genTrade(self, ENA, info, fee, crs):                        # ENA : consumer's encrypt account
+                                                                    # info : read info from blockchain
+                                                                    # fee : payment which trade between peer and consumer
+        account = self.pk_own.decrypt(ENA)
+        account = account - fee
+        ENA_new = self.pk_own.encrypt(account)
+        hk, pk_enc, pk_own = info
+        r = get_random_bytes(16)
+        c = hash(self.pk_enc, pk_own, fee, r, hk)
+        msg = (self.pk_enc, self.pk_own, fee, r, hk)
+        CT = pk_enc.encrypt(msg)
+        x = (c, CT, ENA, ENA_new)
+        w = (r, hk, self.pk_enc, self.pk_own, fee)
+        pi = self.genProof(crs, x, w)
+        tx_msg = tx_msg = "Trade: " + " ".join(c) + " ".join(CT) + " ".join(pi)
+        return makeTransaction(self.pk_enc, tx_msg)
+
+    def getTradeList(self):                                         # Trade List를 주지만, 사실 상 Transaction 다 알려주기
+        try:
+            with open("Transaction.txt", 'r+') as fd:               # Transaction.txt 파일에 올라가있다 가정
+                CTList = fd.readlines()
+                for line in CTList:
+                    line = " ".join([line.rstrip()])
+                return CTList
+        except:
+            return "[P] Error: Cannot read trade list"
+    
+    def scanTrade(self):
+        CTList = self.getTradeList()
+        for ct in CTList:
+            temp = ct.split()
+            if temp[0] == "Trade:":
+                msg = self.pk_enc.decrypt(temp[2])
+                fee = msg[2]
+                if fee > 0:
+                    return fee, ct
+        return "Doesn't exist list waiting for trade"
+
+    def approveTrade(self, fee, c, pk_cons, k, pk, crs):
+        CTk = pk_cons.encrypt(k)
+        x = (c, CTk)
+        w = (hk, k, pk_cons)
+        pi = self.genProof(crs, x, w)
+        tx_msg = (c, CTk, pi)
+        return makeTransaction(self.pk_enc, tx_msg)
 
 def main():
     peer = Peer()
@@ -190,6 +236,10 @@ def main():
     data = img_path; r_data = 1; attr_data = ["M"]; pattr = ["1997", "Incheon", "M"]; pr = [ir[0], ir[3], ir[4]] # 임시로 그냥 끌고 와서 사용
     info, CT = peer.geninfo(pattr, pr, attr_data, r_data, issuer.getPubkey, issuer.getPubkey_data, data)
     peer.registerInfo(info, CT)
+
+    # =========================== [Test:  Trade] =========================== 
+    consumer = Peer()
+
 
 if __name__ == "__main__":
     main()

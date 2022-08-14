@@ -1,4 +1,5 @@
 import hashlib                                                      # 헤더 파일
+from ElGamal import *
 
 def hash(*args):
     msg = str(0)
@@ -11,8 +12,18 @@ def hash(*args):
 
     return result
 
-def makeTransaction(pk, msg):                                       # peer, consumer, issuer 다 사용하기에 
-    return True
+def makeTransaction(pk: ElGamal, msg):                              # peer, consumer, issuer 다 사용하기에 
+    # return True
+    # c1, c2 = pk.sign(msg)
+    try:
+        with open("Transaction.txt", "a+") as fd:
+            # ct = c1 + " ".join(c2)
+            # fd.write(ct)
+            fd.write(msg)
+            fd.write('\n')
+        return True
+    except:
+        return False
                                                                     # 전역 함수로 설정하는게 맞지 않을까
     serealize()                                                     # serealize msg
     sign(pk, msg)                                                   # 메세지 sign하기
