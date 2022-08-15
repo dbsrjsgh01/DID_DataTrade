@@ -195,14 +195,12 @@ class Peer():                                                       # 필요한 
         pk_own = info_list[-1]                                      # Peer의 pk_own 가져오기
         r = get_random_bytes(16)                                    # 난수 뽑기
         c = hash(self.pk_enc, pk_own, fee, r, h_k)
-        msg = [self.pk_enc, self.pk_own, fee, r, h_k]
+        msg = [self.pk_enc.getPublicKey(), self.pk_own, fee, r, h_k]
         c1, c2 = encrypt(pk_enc, msg)
         x = (c, c1, c2, ENA, ENA_new)                               # statement
         w = (r, h_k, self.pk_enc, self.pk_own, fee)                 # witness
         pi = self.genProof(crs, x, w)                               # Trade하기 위해 필요한 정보들이 제대로 입력했음을 나타내는 증명 생성
         tx_msg = "Trade: " + " ".join(map(str, [c, c1, c2, pi]))
-        print("C1\t: ", c1)
-        print("C2\t: ", c2)
         return makeTransaction(self.pk_enc, tx_msg)
 
     def getTradeList(self):                                         # Trade List를 주지만, 사실 상 Transaction 다 알려주기
@@ -219,14 +217,12 @@ class Peer():                                                       # 필요한 
         for ct in CTList:
             temp = ct.split()                                       
             if temp[0] == "Trade:":
-                print("C1\t: ", temp[2])
-                print("C2\t: ", temp[3])
                 msg = self.pk_enc.decrypt(temp[2], temp[3])         # 문제점: 평문의 길이가 너무 길어 잘림
                 print(msg)
                 item = msg.split()
                 try:
-                    if len(item) == 5:                              # 내 sk를 이용하여 제대로 복호화가 되는지 확인
-                        fee = item[2]                               # 금액 확인하고 거래할 것인지 결정
+                    if len(item) == 7:                              # 내 sk를 이용하여 제대로 복호화가 되는지 확인
+                        fee = item[-3]                              # 금액 확인하고 거래할 것인지 결정
                         print(type(fee))
                         print("금액: ", fee)
                         while 1:
@@ -255,28 +251,29 @@ class Peer():                                                       # 필요한 
 
 def main():
     peer = Peer()
-    # issuer = Issuer()
-    # iattr = ["1997", "7", "31", "Incheon", "M"]
-    # print("============================ [Test:  Issue] ============================")
-    # it, ir = peer.requestDIDCredentialIssue(issuer, iattr)
-    # # peer.storeDIDCredential(iattr, it, ir)
-    # # sleep(3)
-    # print("\n============================ [Test: Revoke] ============================")
-    # rattr = ["7", "31"]
-    # rt, rr = peer.requestDIDCredentialRevoke(issuer, rattr)
-    # # peer.deleteDIDCredential(rattr, rt, rr)
-    
-    # data = img_path; r_data = 1; attr_data = ["M"]; pattr = ["1997", "Incheon", "M"]; pr = [ir[0], ir[3], ir[4]] # 임시로 그냥 끌고 와서 사용
-    # info, CT = peer.genInfo(pattr, pr, attr_data, r_data, issuer.getPubkey(), issuer.getPubkey_data(), data)
-    # peer.registerInfo(info, CT)
-
-    info = "Register: " + " ".join(["pre_did", "pre_data", "h_ct", "h_k", " ".join(map(str, peer.pk_enc.getPublicKey())), peer.pk_own])
-    print("\n============================ [Test:  Trade] ============================")
+    issuer = Issuer()
     consumer = Peer()
+    iattr = ["1997", "7", "31", "Incheon", "M"]
+    print("============================ [Test:  Issue] ============================")
+    it, ir = peer.requestDIDCredentialIssue(issuer, iattr)
+    peer.storeDIDCredential(iattr, it, ir)
+    sleep(2)
+    print("\n============================ [Test: Revoke] ============================")
+    rattr = ["7", "31"]
+    rt, rr = peer.requestDIDCredentialRevoke(issuer, rattr)
+    peer.deleteDIDCredential(rattr, rt, rr)
+    
+    print("\n=========================== [Test:  genInfo] ===========================")
+    data = img_path; r_data = 1; attr_data = ["M"]; pattr = ["1997", "Incheon", "M"]; pr = [ir[0], ir[3], ir[4]] # 임시로 그냥 끌고 와서 사용
+    info, CT = peer.genInfo(pattr, pr, attr_data, r_data, issuer.getPubkey(), issuer.getPubkey_data(), data)
+    peer.registerInfo(info, CT)
+    # info = "Register: " + " ".join(["pre_did", "pre_data", "h_ct", "h_k", " ".join(map(str, peer.pk_enc.getPublicKey())), peer.pk_own])
+    
+    print("\n============================ [Test:  Trade] ============================")
     fee = 10
     consumer.genTrade(2, info, fee, 1)
     fee, ct = peer.scanTrade()
-    peer.approveTrade(fee, ct, consumer.pk_enc, peer.getDataKey(), 1)
+    peer.approveTrade(ct, consumer.pk_enc, peer.getDataKey(), 1)
 
 if __name__ == "__main__":
     main()
