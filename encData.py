@@ -51,6 +51,6 @@ class encData():
 
     def enc(self):
         enc_data = self.encrypt_image_ecb(self.data, self.data_key)
-        enc_data.show()
+        # enc_data.show()
         enc_data.save(img_path_enc)
         

@@ -21,8 +21,10 @@ def makeTransaction(pk: ElGamal, msg):                              # peer, cons
             # fd.write(ct)
             fd.write(msg)
             fd.write('\n')
+        print("Transaction Succeeded")
         return True
     except:
+        print("Cannot make transaction")
         return False
                                                                     # 전역 함수로 설정하는게 맞지 않을까
     serealize()                                                     # serealize msg

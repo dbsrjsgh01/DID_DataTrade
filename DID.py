@@ -31,7 +31,7 @@ class Issuer():
             r.append(get_random_bytes(16))                          # random 뽑아서 r에 추가
             data = (addr, a, r[-1])                                 # 하나로 모아서
             t.append(hash(data))                                    # hash한 값을 t에 추가
-        tx_msg = "issue: " + "||".join(t)                           # Transaction 생성하기 위한 메세지 설정
+        tx_msg = "Issue: " + "||".join(t)                           # Transaction 생성하기 위한 메세지 설정
         if (makeTransaction(self.getPubkey(), tx_msg)):             # makeTransaction 호출하여 생성되고 블록체인에 올렸다면
             print("[Issuer]: Issue success")
             return t, r                                             # 생성 성공 시 r, t return
@@ -39,7 +39,7 @@ class Issuer():
             return "[Issuer]: Cannot issue credentials"             # 생성 실패 시 False return
         
     def revokeDIDCredential(self, addr, t):                         # addr: peer의 address / t: revoke하려는 attr의 hash 값
-        tx_msg = "issue: " + "||".join(t)                           # Transaction 생성하기 위한 메세지 설정
+        tx_msg = "Revoke: " + "||".join(t)                          # Transaction 생성하기 위한 메세지 설정
         if (makeTransaction(self.getPubkey(), tx_msg)):             # makeTransaction 호출하여 생성되고 블록체인에 올렸다면
             print("[Issuer]: Revoke success")
             return True                                             # 생성 성공 시 True return
@@ -50,13 +50,16 @@ class Issuer():
 class Peer():                                                       # 필요한 모듈 사용 시 넣기
     def __init__(self):                                             # 개인 key 생성도 같이 할까
         super().__init__()
-        self.addr = "0x1JqFz5Q7iDdKPsMycHk9GsrPPMTqdpKJcn"
+        self.addr = "0x1JqFz5Q7iDdKPsMych_k9GsrPPMTqdpKJcn"
         self.pk_enc = initialize_ElGamal()
         self.sk = self.pk_enc.getPrivateKey()
+        r = get_random_bytes(16)
+        self.pk_own = hash(self.sk, r)
 
     def getAddress(self):
         return self.addr                                            # 주소(addr)을 return
 
+    # =========================== [Code:    DID] =========================== 
     def requestDIDCredentialIssue(self, issuer: Issuer, attr):      # Issuer에게 credential issue 요청 전송
         return issuer.issueDIDCredential(self.getAddress(), attr)   # 비동기식이면 addr과 attr을 메세지 만들어서 issuer에게 보낸다의 형태로 해야 할 듯
         
@@ -129,21 +132,22 @@ class Peer():                                                       # 필요한 
             return False
     
     def genProof(self, crs, x, w):                                  # statement x와 witness w를 가지고 proof pi 생성
-        pi = (crs, x, w)                                            # proof 만들기   
+        pi = [crs, x, w]                                            # proof 만들기   
         return pi
     
     def createDIDPresentation(self, crs, x, attr, r, pk):
         c = hash(pk, hash(self.getAddress(), attr, r))
-        w = (c, attr, r, pk)
+        w = [c, attr, r, pk]
         pi_did = self.genProof(crs, x, w)
-        return (x, pi_did)
+        return [x, pi_did]
     
+    # =========================== [Code:   Data] =========================== 
     def createDataPresentation(self, crs, x, attr_data, r_data, pk_data, data_key, CT, data):
         data_id = hash(data)
         c = hash(pk_data, hash(data_id, attr_data, r_data, data))
-        w = (data_id, c, attr_data, r_data, pk_data, data, data_key, CT)
+        w = [data_id, c, attr_data, r_data, pk_data, data, data_key, CT]
         pi_data = self.genProof(crs, x, w)
-        return (x, pi_data)
+        return [x, pi_data]
 
     def registerInfo(self, info, CT):
         if makeTransaction(self.pk_enc, info):
@@ -151,18 +155,21 @@ class Peer():                                                       # 필요한 
         if self.send2server(CT):
             print("============== [Test: Transfer data to sever completed] ===============")
 
-    def geninfo(self, attr, r, attr_data, r_data, pk_did, pk_data, data):
+    def getDataKey(self):                                           # 추후 consumer와의 거래가 만족스러울 경우 자신의 k를 보내야 하기 위해서
+        return self.k                                               # k를 따로 구하는 것보단 이게 더 낫지 않을까
+
+    def genInfo(self, attr, r, attr_data, r_data, pk_did, pk_data, data):
         # data_id = hash(data)                                      # createDataPresentation에서 생성하고
                                                                     # genProof를 통해 검증하는 것도 있으니 생략해도 괜찮을 듯
-        data_key = get_random_bytes(16); h_k = hash(data_key)
-        CT = self.encset(data_key, data); h_ct = hash(CT)
+        self.k = get_random_bytes(16); h_k = hash(self.k)
+        CT = self.encset(self.k, data); h_ct = hash(CT)
         
-        self.pk_enc = generate()                                    # ElGamal이라 가정
-        self.pk_own = get_random_bytes(16)                          # aes encrypt라 가정
+        # self.pk_enc = generate()                                    # ElGamal이라 가정 (init에서 생성)
+        # self.pk_own = get_random_bytes(16)                          # aes encrypt라 가정
         pre_did = self.createDIDPresentation(1, 1, attr, r, pk_did)
-        pre_data = self.createDataPresentation(1, 1, attr_data, r_data, pk_data, data_key, CT, data)
+        pre_data = self.createDataPresentation(1, 1, attr_data, r_data, pk_data, self.k, CT, data)
        
-        info = (pre_did, pre_data, h_ct, h_k, self.pk_enc, self.pk_own)
+        info = "Register: " + " ".join(["pre_did", "pre_data", h_ct, h_k, " ".join(map(str, self.pk_enc.getPublicKey())), self.pk_own])
         return info, CT
     
     # 나중에 파일에서 불러서 처리할 것
@@ -173,51 +180,71 @@ class Peer():                                                       # 필요한 
         enc = encData(data_key, data)
         enc.enc()
         return enc.getCT()
-
-    def genTrade(self, ENA, info, fee, crs):                        # ENA : consumer's encrypt account
-                                                                    # info : read info from blockchain
-                                                                    # fee : payment which trade between peer and consumer
-        account = self.pk_own.decrypt(ENA)
-        account = account - fee
-        ENA_new = self.pk_own.encrypt(account)
-        hk, pk_enc, pk_own = info
+    
+    # =========================== [Code:  Trade] =========================== 
+    def genTrade(self, ENA, info, fee, crs):                        # ENA : consumer의 암호화된 계좌
+                                                                    # info : blockchain에서 읽어오는 정보
+                                                                    # fee : consumer가 peer에게 지불할 금액
+        # account = self.pk_own.decrypt(ENA)
+        # account = account - fee
+        # ENA_new = self.pk_own.encrypt(account)
+        ENA_new = 1                                                 # ENA에서 fee만큼 빼내어 다시 암호화한 것을 ENA_new라 정의
+        info_list = info.split()
+        h_k = info_list[-5]
+        pk_enc = [info_list[-4], info_list[-3], info_list[-2]]
+        pk_own = info_list[-1]
         r = get_random_bytes(16)
-        c = hash(self.pk_enc, pk_own, fee, r, hk)
-        msg = (self.pk_enc, self.pk_own, fee, r, hk)
-        CT = pk_enc.encrypt(msg)
-        x = (c, CT, ENA, ENA_new)
-        w = (r, hk, self.pk_enc, self.pk_own, fee)
+        c = hash(self.pk_enc, pk_own, fee, r, h_k)
+        msg = [self.pk_enc, self.pk_own, fee, r, h_k]
+        c1, c2 = encrypt(pk_enc, msg)
+        print("Type(c1): ", type(c1))
+        print("Type(c2): ", type(c2))
+        x = (c, c1, c2, ENA, ENA_new)
+        w = (r, h_k, self.pk_enc, self.pk_own, fee)
         pi = self.genProof(crs, x, w)
-        tx_msg = tx_msg = "Trade: " + " ".join(c) + " ".join(CT) + " ".join(pi)
+        tx_msg = "Trade: " + " ".join(map(str, [c, c1, c2, pi]))
         return makeTransaction(self.pk_enc, tx_msg)
 
     def getTradeList(self):                                         # Trade List를 주지만, 사실 상 Transaction 다 알려주기
         try:
             with open("Transaction.txt", 'r+') as fd:               # Transaction.txt 파일에 올라가있다 가정
-                CTList = fd.readlines()
-                for line in CTList:
-                    line = " ".join([line.rstrip()])
+                temp = fd.readlines()
+                CTList = [line.rstrip() for line in temp]
                 return CTList
         except:
             return "[P] Error: Cannot read trade list"
     
-    def scanTrade(self):
+    def scanTrade(self):                                            # Trade List를 보면서 만족스러운 금액이 있을 경우 ㄱㄱ
         CTList = self.getTradeList()
         for ct in CTList:
             temp = ct.split()
+            print(temp[0])
             if temp[0] == "Trade:":
-                msg = self.pk_enc.decrypt(temp[2])
+                msg = self.pk_enc.decrypt(temp[2], temp[3])
+                print(msg)
                 fee = msg[2]
-                if fee > 0:
-                    return fee, ct
-        return "Doesn't exist list waiting for trade"
+                print(type(fee))
+                print("금액: ", fee)
+                while 1:
+                    result = input("수락하시겠습니까?? (Y/N) ")
+                    if result == 'Y' or result == 'y':
+                        return fee, msg
+                    elif result == 'N' or result == 'n':
+                        break
+                    else:
+                        print("올바른 언어를 입력하세요.")
+                        continue
+        print("Doesn't exist list waiting for trade")
+        return -1, -1
 
-    def approveTrade(self, fee, c, pk_cons, k, pk, crs):
+    def approveTrade(self, fee, msg, pk_cons: ElGamal, k, crs):
+        msg = msg.split()
+        c = msg[1]; h_k = msg[-1]
         CTk = pk_cons.encrypt(k)
         x = (c, CTk)
-        w = (hk, k, pk_cons)
+        w = (h_k, k, pk_cons)
         pi = self.genProof(crs, x, w)
-        tx_msg = (c, CTk, pi)
+        tx_msg = "Approve: " + " ".join(map(str, [c, CTk, pi]))
         return makeTransaction(self.pk_enc, tx_msg)
 
 def main():
@@ -228,18 +255,21 @@ def main():
     it, ir = peer.requestDIDCredentialIssue(issuer, iattr)
     peer.storeDIDCredential(iattr, it, ir)
     sleep(3)
-    print("==================== [Test: Revoke] ====================")
-    rattr = ["Incheon", "M"]
+    print("\n==================== [Test: Revoke] ====================")
+    rattr = ["7", "31"]
     rt, rr = peer.requestDIDCredentialRevoke(issuer, rattr)
     peer.deleteDIDCredential(rattr, rt, rr)
     
     data = img_path; r_data = 1; attr_data = ["M"]; pattr = ["1997", "Incheon", "M"]; pr = [ir[0], ir[3], ir[4]] # 임시로 그냥 끌고 와서 사용
-    info, CT = peer.geninfo(pattr, pr, attr_data, r_data, issuer.getPubkey, issuer.getPubkey_data, data)
+    info, CT = peer.genInfo(pattr, pr, attr_data, r_data, issuer.getPubkey(), issuer.getPubkey_data(), data)
     peer.registerInfo(info, CT)
 
-    # =========================== [Test:  Trade] =========================== 
+    print("\n==================== [Test:  Trade] ====================")
     consumer = Peer()
-
+    fee = 10
+    consumer.genTrade(2, info, fee, 1)
+    fee, ct = peer.scanTrade()
+    peer.approveTrade(fee, ct, consumer.pk_enc, peer.getDataKey(), 1)
 
 if __name__ == "__main__":
     main()

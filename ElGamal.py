@@ -65,18 +65,35 @@ class ElGamal:
         return c1, c2
     
     def decrypt(self, c1, c2):
+        c1 = int(c1); c2 = int(c2)
         s = pow(c1, self.x, self.p)
         m = (c2 * inverse(s, self.p)) % self.p
         m = format(m, 'x')
-        msg = unhexlify(m).decode('utf-8')
-        return re.sub("[(,)]","",msg)
+        try:
+            msg = unhexlify(m).decode('utf-8')
+            return re.sub("[(,)]","",msg)
+        except:
+            return 0
+
+def encrypt(pk, *args):
+    p = int(pk[0]); g = int(pk[1]); y = int(pk[2])
+    msg = str()
+    for i in str(args):
+        msg += str(i)
+    msg_byte = msg.encode('utf-8')
+    m = int(hexlify(msg_byte), 16)
+    r = get_random_bytes(16)
+    r = int.from_bytes(r, "big")
+    c1 = pow(g, r, p)
+    c2 = (m * pow(y, r, p)) % p
+    return c1, c2
 
 # def test():
 #     key = initialize_ElGamal()
 #     msg = ("Geonho Yoon", "26", 200)
 #     c1, c2 = key.encrypt(msg)
-#     print("C1\t: ", c1)
-#     print("C2\t: ", c2)
+#     print("C1\t: ", c1, "\tType: ", type(c1))
+#     print("C2\t: ", c2, "\tType: ", type(c2))
 #     dm = key.decrypt(c1, c2)
 #     print("Decrypt : ", dm)
 #     m = dm.split()
