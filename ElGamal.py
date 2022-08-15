@@ -6,13 +6,14 @@ from binascii import hexlify, unhexlify
 import re
 
 def initialize_ElGamal():
-    p = generate_probable_safe_prime(exact_bits=256, randfunc=get_random_bytes)
-    
+    p = generate_probable_safe_prime(exact_bits=2048, randfunc=get_random_bytes)
+    print("p\t: ", p)
     while 1:
         g = pow(Integer.random_range(min_inclusive = 2,
                                     max_exclusive = p,
                                     randfunc = get_random_bytes), 2, p)
-        if (g in (1, 2)) or ((p - 1) % g == 0) or ((p - 1) % g.inverse(p) == 0):
+        inv = g.inverse(p)
+        if (g in (1, 2)) or ((p - 1) % g == 0) or ((p - 1) % inv == 0):
             continue
         break
 
@@ -24,7 +25,7 @@ def initialize_ElGamal():
 
 def generate(key):
     while 1:
-        p = generate_probable_safe_prime(exact_bits=256, randfunc=get_random_bytes)
+        p = generate_probable_safe_prime(exact_bits=2048, randfunc=get_random_bytes)
         if p > key:
             break
         
@@ -68,9 +69,13 @@ class ElGamal:
         c1 = int(c1); c2 = int(c2)
         s = pow(c1, self.x, self.p)
         m = (c2 * inverse(s, self.p)) % self.p
-        m = format(m, 'x')
+        temp = format(m, 'x')
+        print("m\t: ", m)
+        print("temp\t: ", temp)
+        msg = unhexlify(temp).decode('utf-8')
+        return re.sub("[(,)]","",msg)
         try:
-            msg = unhexlify(m).decode('utf-8')
+            msg = unhexlify(temp).decode('utf-8')
             return re.sub("[(,)]","",msg)
         except:
             return 0
@@ -82,8 +87,11 @@ def encrypt(pk, *args):
         msg += str(i)
     msg_byte = msg.encode('utf-8')
     m = int(hexlify(msg_byte), 16)
+    print("m\t: ", m)
     r = get_random_bytes(16)
+    print("r\t: ", r)
     r = int.from_bytes(r, "big")
+    print("r\t: ", r)
     c1 = pow(g, r, p)
     c2 = (m * pow(y, r, p)) % p
     return c1, c2

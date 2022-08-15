@@ -16,7 +16,7 @@ def makeTransaction(pk: ElGamal, msg):                              # peer, cons
     # return True
     # c1, c2 = pk.sign(msg)
     try:
-        with open("Transaction.txt", "a+") as fd:
+        with open("Transaction.txt", "w+") as fd:
             # ct = c1 + " ".join(c2)
             # fd.write(ct)
             fd.write(msg)
