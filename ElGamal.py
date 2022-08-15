@@ -6,7 +6,7 @@ from binascii import hexlify, unhexlify
 import re
 
 def initialize_ElGamal():
-    p = generate_probable_safe_prime(exact_bits=1536, randfunc=get_random_bytes)
+    p = generate_probable_safe_prime(exact_bits=256, randfunc=get_random_bytes)
     while 1:
         g = pow(Integer.random_range(min_inclusive = 2,
                                     max_exclusive = p,
@@ -69,15 +69,8 @@ class ElGamal:
         s = pow(c1, self.x, self.p)
         m = (c2 * inverse(s, self.p)) % self.p
         temp = format(m, 'x')
-        print("m\t: ", m)
-        print("temp\t: ", temp)
         msg = unhexlify(temp).decode('utf-8')
         return re.sub("[(,)]","",msg)
-        try:
-            msg = unhexlify(temp).decode('utf-8')
-            return re.sub("[(,)]","",msg)
-        except:
-            return 0
 
 def encrypt(pk, *args):
     p = int(pk[0]); g = int(pk[1]); y = int(pk[2])
