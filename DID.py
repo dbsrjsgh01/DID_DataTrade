@@ -244,11 +244,11 @@ class Peer():                                                       # 필요한 
 
     def approveTrade(self, msg, pk_cons: ElGamal, k, crs):
         c = msg[1]; h_k = msg[-1]
-        CTk = pk_cons.encrypt(k)
-        x = (c, CTk)
+        EK = pk_cons.encrypt(k)
+        x = (c, EK)
         w = (h_k, k, pk_cons)
         pi = self.genProof(crs, x, w)
-        tx_msg = "Approve: " + " ".join(map(str, [c, CTk, pi]))
+        tx_msg = "Approve: " + " ".join(map(str, [c, EK, pi]))
         return makeTransaction(self.pk_enc, tx_msg)
 
 def main():
